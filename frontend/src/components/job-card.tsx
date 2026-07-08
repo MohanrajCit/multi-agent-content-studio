@@ -1,3 +1,4 @@
+import React from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -13,7 +14,7 @@ const TONE_TEXT: Record<string, string> = {
   danger: "text-red-600",
 };
 
-export function JobCard({ job }: { job: Job }) {
+export const JobCard = React.memo(function JobCard({ job }: { job: Job }) {
   const active = isActive(job.status);
   const score = job.publish_score;
 
@@ -59,4 +60,4 @@ export function JobCard({ job }: { job: Job }) {
       </Card>
     </Link>
   );
-}
+});

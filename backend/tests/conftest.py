@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import app.patch  # Apply compatibility patches first
+
 import os
 
 import pytest

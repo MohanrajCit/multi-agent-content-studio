@@ -35,7 +35,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         "Content-Type": "application/json",
         ...(init?.headers ?? {}),
       },
-      cache: "no-store",
     });
   } catch (cause) {
     throw new ApiError(0, "network_error", "Could not reach the API.", cause);

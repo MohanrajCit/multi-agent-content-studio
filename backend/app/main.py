@@ -6,6 +6,8 @@ pool deterministically.
 """
 from __future__ import annotations
 
+import app.patch  # Apply compatibility patches first
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

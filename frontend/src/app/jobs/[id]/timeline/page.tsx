@@ -27,7 +27,7 @@ export default function TimelinePage() {
   const live = job ? isActive(job.status) : false;
 
   const { data: status, isLoading, isError } = useJobStatus(jobId, { live });
-  const { events: sseEvents, connected, done } = useJobEvents(jobId, true);
+  const { events: sseEvents, connected, done } = useJobEvents(jobId, live);
 
   // Merge authoritative (polled) + streamed events, de-duped by seq.
   const merged = useMemo<StageEvent[]>(() => {

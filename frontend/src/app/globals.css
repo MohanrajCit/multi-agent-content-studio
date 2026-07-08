@@ -75,3 +75,28 @@
 .prose-draft h3 {
   @apply mb-2 mt-4 font-semibold;
 }
+
+/* Smooth page transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+/* GPU acceleration for scrollable panels */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  will-change: scroll-position;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+

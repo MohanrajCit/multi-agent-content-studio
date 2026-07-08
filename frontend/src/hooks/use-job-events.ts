@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
@@ -39,6 +39,17 @@ export function useJobEvents(
   const [error, setError] = useState<string | null>(null);
   const seen = useRef<Set<number>>(new Set());
 
+  // Stable callback for invalidation to avoid dependency churn
+  const invalidateAll = useCallback(
+    (id: string) => {
+      qc.invalidateQueries({ queryKey: queryKeys.status(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.results(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.drafts(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.job(id) });
+    },
+    [qc],
+  );
+
   useEffect(() => {
     if (!jobId || !enabled || typeof window === "undefined") return;
 
@@ -74,10 +85,7 @@ export function useJobEvents(
       setConnected(false);
       source.close();
       // Pull fresh authoritative state now that the run finished.
-      qc.invalidateQueries({ queryKey: queryKeys.status(jobId) });
-      qc.invalidateQueries({ queryKey: queryKeys.results(jobId) });
-      qc.invalidateQueries({ queryKey: queryKeys.drafts(jobId) });
-      qc.invalidateQueries({ queryKey: queryKeys.job(jobId) });
+      invalidateAll(jobId);
     });
 
     source.addEventListener("error", () => {
@@ -87,7 +95,7 @@ export function useJobEvents(
     });
 
     return () => source.close();
-  }, [jobId, enabled, qc]);
+  }, [jobId, enabled, invalidateAll]);
 
   return { events, connected, done, finalStatus, error };
 }

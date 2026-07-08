@@ -19,7 +19,7 @@ export function useJobs() {
     queryKey: queryKeys.jobs,
     queryFn: api.listJobs,
     refetchInterval: (query) =>
-      (query.state.data ?? []).some((j) => isActive(j.status)) ? 4000 : false,
+      (query.state.data ?? []).some((j) => isActive(j.status)) ? 5000 : false,
   });
 }
 
@@ -28,6 +28,7 @@ export function useJob(id: string) {
     queryKey: queryKeys.job(id),
     queryFn: () => api.getJob(id),
     enabled: !!id,
+    staleTime: 30_000,
   });
 }
 
@@ -38,7 +39,7 @@ export function useJobStatus(id: string, opts?: { live?: boolean }) {
     enabled: !!id,
     refetchInterval: (query) =>
       opts?.live && query.state.data && isActive(query.state.data.status)
-        ? 3000
+        ? 4000
         : false,
   });
 }
@@ -48,6 +49,7 @@ export function useJobResults(id: string) {
     queryKey: queryKeys.results(id),
     queryFn: () => api.getResults(id),
     enabled: !!id,
+    staleTime: 60_000,
   });
 }
 
@@ -56,6 +58,7 @@ export function useDrafts(id: string) {
     queryKey: queryKeys.drafts(id),
     queryFn: () => api.listDrafts(id),
     enabled: !!id,
+    staleTime: 30_000,
   });
 }
 
@@ -64,6 +67,7 @@ export function useDraft(id: string, version: number | null) {
     queryKey: queryKeys.draft(id, version ?? -1),
     queryFn: () => api.getDraft(id, version as number),
     enabled: !!id && version != null && version > 0,
+    staleTime: 60_000,
   });
 }
 

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { slug: "timeline", label: "Timeline" },
+  { slug: "visualizer", label: "Visualizer" },
   { slug: "research", label: "Research" },
   { slug: "strategy", label: "Strategy" },
   { slug: "draft", label: "Draft" },
@@ -25,6 +26,7 @@ export function JobTabs({ jobId }: { jobId: string }) {
           <Link
             key={tab.slug}
             href={href}
+            prefetch
             className={cn(
               "border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
               active
