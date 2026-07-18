@@ -20,5 +20,11 @@ if not hasattr(pydantic, 'ModelWrapValidatorHandler'):
     from pydantic.functional_validators import ModelWrapValidatorHandler
     pydantic.ModelWrapValidatorHandler = ModelWrapValidatorHandler
 
-# Trigger Uvicorn reload
+# 3. Mock lancedb and pyarrow to bypass Windows Application Control DLL load block
+import sys
+from unittest.mock import MagicMock
+sys.modules['pyarrow'] = MagicMock()
+sys.modules['pyarrow.dataset'] = MagicMock()
+sys.modules['lancedb'] = MagicMock()
 
+# Trigger Uvicorn reload

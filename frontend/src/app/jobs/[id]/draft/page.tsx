@@ -1,6 +1,5 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { FileText, History, Loader2, RotateCcw } from "lucide-react";
@@ -23,8 +22,7 @@ import { ApiError } from "@/lib/api";
 import { DRAFT_ORIGIN_LABEL, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export default function DraftEditorPage() {
-  const { id: jobId } = useParams<{ id: string }>();
+export default function DraftEditorPage({ jobId }: { jobId: string }) {
   const drafts = useDrafts(jobId);
   const restore = useRestoreVersion(jobId);
   const [selected, setSelected] = useState<number | null>(null);

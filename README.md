@@ -23,6 +23,16 @@ Unlike simple wrapper apps, this studio leverages **CrewAI Flows** to enforce st
 
 ---
 
+## 📸 Screenshots
+
+### Pipeline Progress & Event Log
+![Pipeline Progress & Event Log](docs/screenshots/timeline.png)
+
+### Swarm Control Center & Interactive Sandbox
+![Swarm Control Center & Interactive Sandbox](docs/screenshots/agents_workflow.png)
+
+---
+
 ## 🌟 The Novelty
 
 Most AI writing tools are "thin wrappers" around a single LLM prompt. AI Content Intelligence Studio is fundamentally different:

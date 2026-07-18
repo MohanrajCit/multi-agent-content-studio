@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # ── LLM provider selection ──
     # Switch the entire platform between providers with this one setting.
-    llm_provider: Literal["gemini", "openrouter"] = "gemini"
+    llm_provider: Literal["gemini", "openrouter", "groq"] = "gemini"
 
     # ── AI / Search / Extraction ──
     openrouter_api_key: SecretStr = SecretStr("")
@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr = SecretStr("")
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     gemini_model: str = "gemini-2.5-pro"
+
+    groq_api_key: SecretStr = SecretStr("")
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_model: str = "llama3-70b-8192"
 
     serper_api_key: SecretStr = SecretStr("")
     firecrawl_api_key: SecretStr = SecretStr("")

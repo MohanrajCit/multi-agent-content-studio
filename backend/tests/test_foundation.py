@@ -2,21 +2,33 @@
 from __future__ import annotations
 
 
-def test_settings_load(settings):
-    assert settings.app_env == "test"
-    assert settings.database_url.startswith("postgresql+asyncpg")
-    # secrets default to empty SecretStr, not None
-    assert settings.openrouter_api_key.get_secret_value() == ""
-    assert settings.langfuse_enabled is False
+def test_settings_load(monkeypatch):
+    for key in ["OPENROUTER_API_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"]:
+        monkeypatch.delenv(key, raising=False)
+
+    from app.core.config import Settings
+    s = Settings(_env_file=None)
+    assert s.app_env == "test"
+    assert s.database_url.startswith("postgresql+asyncpg")
+    assert s.openrouter_api_key.get_secret_value() == ""
+    assert s.langfuse_enabled is False
 
 
 def test_app_factory_builds():
     from app.main import create_app
 
     app = create_app()
-    routes = {r.path for r in app.routes}
-    assert "/health" in routes
-    assert "/ready" in routes
+    paths = set()
+    for r in app.routes:
+        if hasattr(r, "path"):
+            paths.add(r.path)
+        elif hasattr(r, "original_router") and hasattr(r.original_router, "routes"):
+            prefix = getattr(r.include_context, "prefix", "") if hasattr(r, "include_context") else ""
+            for sub_r in r.original_router.routes:
+                if hasattr(sub_r, "path"):
+                    paths.add(prefix + sub_r.path)
+    assert "/health" in paths
+    assert "/ready" in paths
 
 
 def test_error_envelope_shape():

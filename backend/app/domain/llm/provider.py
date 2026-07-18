@@ -1,7 +1,7 @@
 """LLM provider abstraction (req 3, 4, 5).
 
 `build_client` and `build_llm` are the ONLY provider-aware code in the system.
-Switching providers is a single setting — LLM_PROVIDER=gemini|openrouter — and
+Switching providers is a single setting — LLM_PROVIDER=gemini|openrouter|groq — and
 nothing in agents/tasks/crews/flows changes.
 """
 from __future__ import annotations
@@ -15,6 +15,8 @@ from app.domain.llm.crew_llm import CrewCompletionLLM
 from app.integrations.gemini_client import GeminiClient
 from app.integrations.langfuse_tracer import LangfuseTracer
 from app.integrations.openrouter_client import OpenRouterClient
+from app.integrations.groq_client import GroqClient
+from app.integrations.fallback_client import FallbackClient
 from app.integrations.types import CompletionClient
 
 logger = get_logger("llm_provider")
@@ -23,6 +25,7 @@ logger = get_logger("llm_provider")
 class LLMProvider(str, enum.Enum):
     GEMINI = "gemini"
     OPENROUTER = "openrouter"
+    GROQ = "groq"
 
 
 def resolve_provider(settings: Settings) -> LLMProvider:
@@ -31,29 +34,70 @@ def resolve_provider(settings: Settings) -> LLMProvider:
 
 def active_model(settings: Settings) -> str:
     """The model id for the currently selected provider."""
-    if resolve_provider(settings) is LLMProvider.GEMINI:
+    provider = resolve_provider(settings)
+    if provider is LLMProvider.GEMINI:
         return settings.gemini_model
+    if provider is LLMProvider.GROQ:
+        return settings.groq_model
     return settings.openrouter_model
 
 
 def build_client(settings: Settings) -> CompletionClient:
-    """Construct the chat-completion client for the configured provider."""
+    """Construct the chat-completion client for the configured provider, with automatic fallback."""
     provider = resolve_provider(settings)
-    if provider is LLMProvider.GEMINI:
-        logger.info("llm_provider_selected", provider="gemini", model=settings.gemini_model)
-        return GeminiClient(
+    clients: list[CompletionClient] = []
+    
+    # 1. Primary Provider
+    if provider is LLMProvider.GEMINI and settings.gemini_api_key.get_secret_value():
+        clients.append(GeminiClient(
             api_key=settings.gemini_api_key.get_secret_value(),
             base_url=settings.gemini_base_url,
             default_model=settings.gemini_model,
-        )
-    logger.info(
-        "llm_provider_selected", provider="openrouter", model=settings.openrouter_model
-    )
-    return OpenRouterClient(
-        api_key=settings.openrouter_api_key.get_secret_value(),
-        base_url=settings.openrouter_base_url,
-        default_model=settings.openrouter_model,
-    )
+        ))
+    elif provider is LLMProvider.OPENROUTER and settings.openrouter_api_key.get_secret_value():
+        clients.append(OpenRouterClient(
+            api_key=settings.openrouter_api_key.get_secret_value(),
+            base_url=settings.openrouter_base_url,
+            default_model=settings.openrouter_model,
+        ))
+    elif provider is LLMProvider.GROQ and settings.groq_api_key.get_secret_value():
+        clients.append(GroqClient(
+            api_key=settings.groq_api_key.get_secret_value(),
+            base_url=settings.groq_base_url,
+            default_model=settings.groq_model,
+        ))
+
+    # 2. Fallback Providers
+    if provider is not LLMProvider.OPENROUTER and settings.openrouter_api_key.get_secret_value():
+        clients.append(OpenRouterClient(
+            api_key=settings.openrouter_api_key.get_secret_value(),
+            base_url=settings.openrouter_base_url,
+            default_model=settings.openrouter_model,
+        ))
+        
+    if provider is not LLMProvider.GROQ and settings.groq_api_key.get_secret_value():
+        clients.append(GroqClient(
+            api_key=settings.groq_api_key.get_secret_value(),
+            base_url=settings.groq_base_url,
+            default_model=settings.groq_model,
+        ))
+        
+    if provider is not LLMProvider.GEMINI and settings.gemini_api_key.get_secret_value():
+        clients.append(GeminiClient(
+            api_key=settings.gemini_api_key.get_secret_value(),
+            base_url=settings.gemini_base_url,
+            default_model=settings.gemini_model,
+        ))
+        
+    if not clients:
+        raise ValueError("No LLM API keys configured for any provider.")
+
+    logger.info("llm_providers_configured", primary=provider.value, num_fallbacks=len(clients)-1)
+
+    if len(clients) == 1:
+        return clients[0]
+        
+    return FallbackClient(clients)
 
 
 def build_llm(

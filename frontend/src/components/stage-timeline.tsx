@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Check, CircleDashed, Loader2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +51,7 @@ const TONE: Record<StageState, "neutral" | "info" | "success" | "danger"> = {
 };
 
 export function StageTimeline({ events }: { events: StageEvent[] }) {
-  const states = deriveStageStates(events);
+  const states = React.useMemo(() => deriveStageStates(events), [events]);
 
   return (
     <ol className="relative space-y-1">

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from crewai.flow.flow import Flow, listen, router, start
+from crewai.flow.flow import Flow, listen, router, start, or_
 from pydantic import BaseModel, PrivateAttr
 
 from app.core.constants import RunStatus, StageName
@@ -52,6 +52,7 @@ class PipelineState(BaseModel):
 
     rejected: bool = False
     rejection_reason: str | None = None
+    retry_count: int = 0
 
 
 class ContentIntelligenceFlow(Flow[PipelineState]):
@@ -130,6 +131,7 @@ class ContentIntelligenceFlow(Flow[PipelineState]):
     @listen("valid")
     def run_research(self) -> None:
         self.store.emit_event(self.state.job_id, StageName.RESEARCH, RunStatus.RUNNING)
+        self.store.emit_event(self.state.job_id, StageName.COMPETITOR, RunStatus.RUNNING)
         try:
             research, competitor = self.runner.research(self._inputs())
         except Exception as exc:
@@ -141,6 +143,7 @@ class ContentIntelligenceFlow(Flow[PipelineState]):
 
     @listen(run_research)
     def run_strategy(self) -> None:
+        self.store.emit_event(self.state.job_id, StageName.GAP, RunStatus.RUNNING)
         self.store.emit_event(self.state.job_id, StageName.STRATEGY, RunStatus.RUNNING)
         try:
             upstream = to_upstream(self.state.research, self.state.competitor)
@@ -163,8 +166,25 @@ class ContentIntelligenceFlow(Flow[PipelineState]):
         self.state.draft = draft
         self._persist(StageName.WRITER, draft)
 
-    @listen(run_content)
-    def run_quality(self) -> EvaluationReport:
+    @listen("retry")
+    def run_content_retry(self) -> None:
+        self.state.retry_count += 1
+        self.store.emit_event(
+            self.state.job_id,
+            StageName.WRITER,
+            RunStatus.RUNNING,
+            detail=f"Regenerating draft article (Attempt {self.state.retry_count + 1}) to improve quality score from {self.state.evaluation.publish_readiness}/100 based on evaluator suggestions.",
+        )
+        try:
+            upstream = to_upstream(self.state.strategy, self.state.research, self.state.evaluation)
+            draft = self.runner.content(self._inputs(), upstream).recount()
+        except Exception as exc:
+            self._fail_stage(StageName.WRITER, exc)
+        self.state.draft = draft
+        self._persist(StageName.WRITER, draft)
+
+    @router(or_(run_content, run_content_retry))
+    def run_quality(self) -> str:
         self.store.emit_event(self.state.job_id, StageName.EVALUATOR, RunStatus.RUNNING)
         try:
             upstream = to_upstream(self.state.draft)
@@ -173,7 +193,32 @@ class ContentIntelligenceFlow(Flow[PipelineState]):
             self._fail_stage(StageName.EVALUATOR, exc)
         self.state.evaluation = evaluation
         self._persist(StageName.EVALUATOR, evaluation)
-        return evaluation
+
+        if self.state.evaluation.publish_readiness < 90.0 and self.state.retry_count < 2:
+            logger.info(
+                "quality_score_below_threshold_triggering_retry",
+                job_id=self.state.job_id,
+                score=self.state.evaluation.publish_readiness,
+                retry_count=self.state.retry_count,
+            )
+            return "retry"
+        else:
+            logger.info(
+                "quality_score_accepted_or_max_retries_reached",
+                job_id=self.state.job_id,
+                score=self.state.evaluation.publish_readiness,
+                retry_count=self.state.retry_count,
+            )
+            return "approved"
+
+    @listen("approved")
+    def finalize_flow(self) -> None:
+        logger.info(
+            "flow_finalized",
+            job_id=self.state.job_id,
+            final_score=self.state.evaluation.publish_readiness,
+            retries=self.state.retry_count,
+        )
 
     @listen("invalid")
     def finalize_rejected(self) -> None:

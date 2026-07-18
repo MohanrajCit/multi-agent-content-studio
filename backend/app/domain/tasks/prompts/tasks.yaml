@@ -54,6 +54,9 @@ strategist:
     {upstream}
     Produce a brief, search intent, working title, keyword plan, and a
     section-by-section outline with stable section_ids and key points.
+    Ensure the outline ALWAYS includes a final section for References (using
+    section_id "references" and heading "References") to list the source URLs
+    and organizations cited.
   expected_output: >
     A ContentStrategy JSON with brief, search_intent, title, keyword_plan,
     outline (section_id, heading, key_points, target_keywords, estimated_words),
@@ -73,9 +76,10 @@ writer:
     five quality dimensions it will be scored on:
 
     TRUSTWORTHINESS — Ground claims in evidence. Cite the research report's real
-    sources using inline Markdown links [anchor](url), and weave in the concrete
-    trends, statistics, and data points it provides. Attribute named studies or
-    organizations where the research supplies them. NEVER invent statistics, quotes,
+    sources using inline Markdown links [anchor](url) and inline citation numbers (e.g. [1], [2]).
+    You MUST append a final section in your sections list with section_id "references"
+    and heading "References" that contains a clean, bulleted list of all external sources,
+    articles, and databases used/cited, including their URLs. NEVER invent statistics, quotes,
     sources, or URLs — use only what the research payload contains; if a claim has no
     supporting evidence, phrase it as a clearly-framed projection rather than fact.
     Include at least one short, concrete example or scenario relevant to "{audience}".
@@ -96,6 +100,12 @@ writer:
     AUDIENCE MATCH — Address the reader directly ("you", "your team"), frame points
     around the decisions and outcomes "{audience}" cares about, and keep any call to
     action as a natural next step rather than a hard sell.
+
+    REVISION INSTRUCTIONS — If the upstream payload also includes a previous quality
+    evaluation report, you MUST carefully review all scores, negative rationales, and
+    suggestions (especially regarding TRUSTWORTHINESS/citations/references, SEO/readability,
+    or structure), and rewrite or revise the sections to address every single suggestion,
+    ensuring all quality scores reach 90+.
   expected_output: >
     A DraftArticle JSON with title, a 150-160 character meta_description, and sections
     (section_id, heading, content as Markdown, word_count). Section bodies use H3
@@ -109,6 +119,9 @@ evaluator:
     {upstream}
     Score SEO, readability, structure, trustworthiness, and audience_match from
     0-100 each, with a rationale and concrete suggestions per dimension.
+    For TRUSTWORTHINESS: A score of 90+ requires a dedicated "References" section at
+    the end of the article containing a complete list of citations, alongside inline links.
+    If the References section is present and correct, score trustworthiness 90+.
   expected_output: >
     An EvaluationReport JSON with seo, readability, structure, trustworthiness,
     audience_match (each: score, rationale, suggestions) and an overall summary.

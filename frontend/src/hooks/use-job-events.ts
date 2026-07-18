@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, createContext, useContext, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
@@ -19,6 +19,14 @@ interface DonePayload {
   id: string;
   status: JobStatus;
   publish_score: number | null;
+}
+
+export const JobEventsContext = createContext<JobEventsState | null>(null);
+
+export function useSharedJobEvents() {
+  const ctx = useContext(JobEventsContext);
+  if (!ctx) throw new Error("Missing JobEventsContext");
+  return ctx;
 }
 
 /**
@@ -97,5 +105,8 @@ export function useJobEvents(
     return () => source.close();
   }, [jobId, enabled, invalidateAll]);
 
-  return { events, connected, done, finalStatus, error };
+  return useMemo(
+    () => ({ events, connected, done, finalStatus, error }),
+    [events, connected, done, finalStatus, error]
+  );
 }

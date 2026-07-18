@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  devIndicators: false,
   eslint: {
     // Lint is run separately; don't fail production builds on lint.
     ignoreDuringBuilds: true,

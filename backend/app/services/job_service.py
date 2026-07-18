@@ -24,6 +24,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+import asyncio
+from typing import Any
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -102,6 +104,7 @@ class JobRecord:
     drafts: list[DraftRecord] = field(default_factory=list)
     events: list[EventRecord] = field(default_factory=list)
     created_at: datetime = field(default_factory=_now)
+    _listeners: list[Any] = field(default_factory=list, init=False, repr=False)
 
     @property
     def current_draft(self) -> DraftRecord | None:
@@ -114,10 +117,11 @@ class JobRecord:
 class JobService:
     """In-memory pipeline orchestrator + flow StageStore."""
 
-    def __init__(self, runner: PipelineRunner) -> None:
+    def __init__(self, runner: PipelineRunner, *, is_test: bool = False) -> None:
         self._runner = runner
         self._jobs: dict[str, JobRecord] = {}
         self._seq = 0
+        self.is_test = is_test
 
     # ── StageStore port (called by flows during kickoff) ──────────────────
     def save_stage(self, job_id: str, stage: StageName, payload: BaseModel) -> None:
@@ -135,9 +139,16 @@ class JobService:
     ) -> None:
         job = self._jobs[job_id]
         self._seq += 1
-        job.events.append(EventRecord(stage=stage, status=status, detail=detail, seq=self._seq))
+        event = EventRecord(stage=stage, status=status, detail=detail, seq=self._seq)
+        job.events.append(event)
         if status is RunStatus.RUNNING and job.status not in _TERMINAL:
             job.status = _STAGE_TO_STATUS.get(stage, job.status)
+
+        for q in job._listeners:
+            try:
+                q.put_nowait(event)
+            except Exception:
+                pass
 
     # ── use cases ─────────────────────────────────────────────────────────
     async def create_job(
@@ -161,6 +172,34 @@ class JobService:
         )
         self._jobs[job.id] = job
 
+        if self.is_test:
+            flow = ContentIntelligenceFlow(self._runner, self)
+            inputs = {"job_id": job.id, **self._request_inputs(job)}
+            try:
+                await run_in_threadpool(flow.kickoff, inputs=inputs)
+            except Exception as exc:  # noqa: BLE001 — surface as FAILED, never 500 the pipeline
+                logger.error("job_failed", job_id=job.id, error=str(exc))
+                job.status = JobStatus.FAILED
+                job.rejection_reason = f"pipeline error: {exc}"
+                return job
+
+            profile = job.stages.get(StageName.GUARD)
+            if profile is not None and not getattr(profile, "is_valid", True):
+                job.status = JobStatus.REJECTED
+                job.rejection_reason = getattr(profile, "rejection_reason", None)
+                return job
+
+            article = job.stages.get(StageName.WRITER)
+            if isinstance(article, DraftArticle):
+                self._append_draft(job, article, origin=DraftOrigin.PIPELINE, parent_version=None)
+            job.status = JobStatus.DONE
+            logger.info("job_done", job_id=job.id, publish_score=job.publish_score)
+        else:
+            asyncio.create_task(self._run_pipeline(job))
+
+        return job
+
+    async def _run_pipeline(self, job: JobRecord) -> None:
         flow = ContentIntelligenceFlow(self._runner, self)
         inputs = {"job_id": job.id, **self._request_inputs(job)}
         try:
@@ -169,20 +208,29 @@ class JobService:
             logger.error("job_failed", job_id=job.id, error=str(exc))
             job.status = JobStatus.FAILED
             job.rejection_reason = f"pipeline error: {exc}"
-            return job
+            self._notify_listeners(job)
+            return
 
         profile = job.stages.get(StageName.GUARD)
         if profile is not None and not getattr(profile, "is_valid", True):
             job.status = JobStatus.REJECTED
             job.rejection_reason = getattr(profile, "rejection_reason", None)
-            return job
+            self._notify_listeners(job)
+            return
 
         article = job.stages.get(StageName.WRITER)
         if isinstance(article, DraftArticle):
             self._append_draft(job, article, origin=DraftOrigin.PIPELINE, parent_version=None)
         job.status = JobStatus.DONE
         logger.info("job_done", job_id=job.id, publish_score=job.publish_score)
-        return job
+        self._notify_listeners(job)
+
+    def _notify_listeners(self, job: JobRecord) -> None:
+        for q in job._listeners:
+            try:
+                q.put_nowait(None)
+            except Exception:
+                pass
 
     async def regenerate_section(
         self, job_id: str, version: int, *, section_id: str, instruction: str
@@ -263,8 +311,31 @@ class JobService:
         live (worker-fed) stream without changing the endpoint.
         """
         job = self._require_job(job_id)
+        
+        yielded_seqs = set()
         for event in list(job.events):
             yield event
+            yielded_seqs.add(event.seq)
+
+        if job.status in _TERMINAL:
+            return
+
+        q = asyncio.Queue()
+        job._listeners.append(q)
+
+        try:
+            while job.status not in _TERMINAL or not q.empty():
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=1.0)
+                    if event is not None and event.seq not in yielded_seqs:
+                        yield event
+                        yielded_seqs.add(event.seq)
+                except asyncio.TimeoutError:
+                    if job.status in _TERMINAL and q.empty():
+                        break
+        finally:
+            if q in job._listeners:
+                job._listeners.remove(q)
 
     # ── internals ─────────────────────────────────────────────────────────
     @staticmethod

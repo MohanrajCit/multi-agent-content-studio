@@ -19,7 +19,7 @@ export function useJobs() {
     queryKey: queryKeys.jobs,
     queryFn: api.listJobs,
     refetchInterval: (query) =>
-      (query.state.data ?? []).some((j) => isActive(j.status)) ? 5000 : false,
+      (query.state.data ?? []).some((j) => isActive(j.status)) ? 1000 : false,
   });
 }
 
@@ -39,7 +39,7 @@ export function useJobStatus(id: string, opts?: { live?: boolean }) {
     enabled: !!id,
     refetchInterval: (query) =>
       opts?.live && query.state.data && isActive(query.state.data.status)
-        ? 4000
+        ? 1000
         : false,
   });
 }

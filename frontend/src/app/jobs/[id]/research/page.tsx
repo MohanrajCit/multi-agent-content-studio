@@ -1,6 +1,5 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { Lightbulb, Search, Swords, Target } from "lucide-react";
 
 import { EmptyState, ErrorState } from "@/components/states";
@@ -51,8 +50,7 @@ function Section({
   );
 }
 
-export default function ResearchPage() {
-  const { id: jobId } = useParams<{ id: string }>();
+export default function ResearchPage({ jobId }: { jobId: string }) {
   const { data, isLoading, isError } = useJobResults(jobId);
 
   if (isError) return <ErrorState message="Could not load research insights." />;

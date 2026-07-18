@@ -4,11 +4,16 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
+import tenacity
 
 from app.core.errors import ExternalServiceError
 from app.integrations.firecrawl_client import FirecrawlClient
 from app.integrations.openrouter_client import OpenRouterClient
 from app.integrations.serper_client import SerperClient
+from app.integrations.retry import RETRY_KWARGS
+
+# Speed up retries during unit tests by making wait time 0
+RETRY_KWARGS["wait"] = tenacity.wait_fixed(0)
 
 
 @respx.mock
@@ -95,7 +100,7 @@ async def test_5xx_retries_then_raises():
     with pytest.raises(ExternalServiceError):
         await client.search("x")
     await client.aclose()
-    assert route.call_count == 4  # stop_after_attempt(4)
+    assert route.call_count == 6  # stop_after_attempt(6)
 
 
 @respx.mock
@@ -107,13 +112,18 @@ async def test_429_is_retried_as_transient():
     with pytest.raises(ExternalServiceError):
         await client.search("x")
     await client.aclose()
-    assert route.call_count == 4  # 429 retried with backoff, then raised
+    assert route.call_count == 6  # 429 retried with backoff, then raised
 
 
-def test_langfuse_noop_when_disabled(settings):
+def test_langfuse_noop_when_disabled(monkeypatch):
+    for key in ["LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"]:
+        monkeypatch.delenv(key, raising=False)
+
+    from app.core.config import Settings
     from app.integrations.langfuse_tracer import LangfuseTracer
 
-    tracer = LangfuseTracer(settings)
+    s = Settings(_env_file=None)
+    tracer = LangfuseTracer(s)
     assert tracer.enabled is False
     trace = tracer.trace("t")
     with tracer.span(trace, "s") as span:

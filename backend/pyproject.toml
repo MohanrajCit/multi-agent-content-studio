@@ -56,6 +56,7 @@ type = "layers"
 layers = [
     "app.api",
     "app.services",
-    "app.repositories",
-    "app.db",
 ]
+
+[tool.setuptools]
+packages = ["app"]

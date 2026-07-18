@@ -54,16 +54,17 @@ def _draft():
     )
 
 
-def _evaluation():
-    d = DimensionScore(score=70)
+def _evaluation(score=95):
+    d = DimensionScore(score=score)
     return EvaluationReport(
         seo=d, readability=d, structure=d, trustworthiness=d, audience_match=d
     )
 
 
 class FakeRunner:
-    def __init__(self, profile=None):
+    def __init__(self, profile=None, score=95):
         self._profile = profile or _valid_profile()
+        self._score = score
         self.calls: list[str] = []
 
     def guard(self, inputs):
@@ -84,7 +85,7 @@ class FakeRunner:
 
     def quality(self, inputs, upstream):
         self.calls.append("quality")
-        return _evaluation()
+        return _evaluation(score=self._score)
 
 
 def _kickoff_inputs():
@@ -105,7 +106,30 @@ def test_full_pipeline_runs_all_stages_in_order():
     for stage in (StageName.GUARD, StageName.RESEARCH, StageName.COMPETITOR,
                   StageName.GAP, StageName.STRATEGY, StageName.WRITER, StageName.EVALUATOR):
         assert store.get("job-1", stage) is not None
-    assert flow.state.evaluation.publish_readiness == 70.0
+    assert flow.state.evaluation.publish_readiness == 95.0
+
+
+def test_pipeline_retries_on_low_quality_score():
+    class ImprovingRunner(FakeRunner):
+        def __init__(self):
+            super().__init__(score=70)
+
+        def quality(self, inputs, upstream):
+            self.calls.append("quality")
+            current_score = self._score
+            self._score = 95
+            return _evaluation(score=current_score)
+
+    runner = ImprovingRunner()
+    store = InMemoryStageStore()
+    flow = ContentIntelligenceFlow(runner, store)
+    flow.kickoff(inputs=_kickoff_inputs())
+
+    assert runner.calls == [
+        "guard", "research", "strategy", "content", "quality", "content", "quality"
+    ]
+    assert flow.state.retry_count == 1
+    assert flow.state.evaluation.publish_readiness == 95.0
 
 
 def test_invalid_request_short_circuits():

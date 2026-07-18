@@ -1,5 +1,4 @@
 import React from "react";
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { JobStatusBadge } from "@/components/status-badge";
 import { isActive, relativeTime, scoreBand } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Job } from "@/lib/types";
+import { useAppNavigation } from "@/app/providers";
 
 const TONE_TEXT: Record<string, string> = {
   success: "text-emerald-600",
@@ -15,27 +15,31 @@ const TONE_TEXT: Record<string, string> = {
 };
 
 export const JobCard = React.memo(function JobCard({ job }: { job: Job }) {
+  const { navigate } = useAppNavigation();
   const active = isActive(job.status);
   const score = job.publish_score;
 
   return (
-    <Link href={`/jobs/${job.id}/timeline`} className="group block">
-      <Card className="transition-colors group-hover:border-primary/40 group-hover:shadow-md">
+    <button
+      onClick={() => navigate("job-detail", job.id, "timeline")}
+      className="group block w-full text-left focus:outline-none"
+    >
+      <Card className="transition-colors group-hover:border-primary/40 group-hover:shadow-md border-slate-900 bg-[#070b13] hover:border-slate-800/80">
         <CardContent className="flex items-center gap-4 p-4">
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex items-center gap-2">
               <JobStatusBadge status={job.status} />
               {active ? (
-                <span className="flex items-center gap-1 text-xs text-sky-600">
+                <span className="flex items-center gap-1 text-xs text-sky-650">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
                   live
                 </span>
               ) : null}
             </div>
-            <p className="truncate font-medium" title={job.topic}>
+            <p className="truncate font-medium text-slate-200" title={job.topic}>
               {job.topic}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-xs text-slate-500">
               {job.audience} · {job.platform} · {relativeTime(job.created_at)}
             </p>
           </div>
@@ -45,19 +49,19 @@ export const JobCard = React.memo(function JobCard({ job }: { job: Job }) {
               <p
                 className={cn(
                   "text-2xl font-bold tabular-nums",
-                  score == null ? "text-muted-foreground" : TONE_TEXT[scoreBand(score)],
+                  score == null ? "text-slate-500" : TONE_TEXT[scoreBand(score)],
                 )}
               >
                 {score == null ? "—" : Math.round(score)}
               </p>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">
                 readiness
               </p>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            <ArrowRight className="h-4 w-4 text-slate-500 transition-transform group-hover:translate-x-0.5" />
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </button>
   );
 });

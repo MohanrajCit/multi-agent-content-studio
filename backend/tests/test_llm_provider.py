@@ -38,23 +38,30 @@ def test_default_provider_is_gemini():
 def test_gemini_provider_initialization():
     s = _settings(llm_provider="gemini", gemini_model="gemini-2.5-pro")
     client = build_client(s)
-    assert isinstance(client, GeminiClient)
-    assert client.default_model == "gemini-2.5-pro"
+    # With multiple keys, build_client returns a FallbackClient. First client is the primary.
+    from app.integrations.fallback_client import FallbackClient
+    assert isinstance(client, FallbackClient)
+    primary_client = client.clients[0]
+    assert isinstance(primary_client, GeminiClient)
+    assert primary_client.default_model == "gemini-2.5-pro"
     assert active_model(s) == "gemini-2.5-pro"
 
 
 def test_openrouter_provider_initialization():
     s = _settings(llm_provider="openrouter", openrouter_model="anthropic/claude-opus-4")
     client = build_client(s)
-    assert isinstance(client, OpenRouterClient)
-    assert client.default_model == "anthropic/claude-opus-4"
+    from app.integrations.fallback_client import FallbackClient
+    assert isinstance(client, FallbackClient)
+    primary_client = client.clients[0]
+    assert isinstance(primary_client, OpenRouterClient)
+    assert primary_client.default_model == "anthropic/claude-opus-4"
     assert active_model(s) == "anthropic/claude-opus-4"
 
 
 def test_provider_selection_through_settings():
     # req 5: switching is a single setting; adapter stays the same opaque type.
-    gem_llm = build_llm(_settings(llm_provider="gemini"))
-    or_llm = build_llm(_settings(llm_provider="openrouter"))
+    gem_llm = build_llm(_settings(llm_provider="gemini", gemini_model="gemini-2.5-pro"))
+    or_llm = build_llm(_settings(llm_provider="openrouter", openrouter_model="anthropic/claude-opus-4"))
 
     assert gem_llm.provider_name == "gemini"
     assert gem_llm.model == "gemini-2.5-pro"

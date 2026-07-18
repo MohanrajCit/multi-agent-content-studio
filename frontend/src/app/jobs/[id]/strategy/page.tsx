@@ -1,6 +1,5 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { ListChecks, Search } from "lucide-react";
 
 import { EmptyState, ErrorState } from "@/components/states";
@@ -27,8 +26,7 @@ function Chips({ items, tone = "neutral" as const }: { items: string[]; tone?: "
   );
 }
 
-export default function StrategyPage() {
-  const { id: jobId } = useParams<{ id: string }>();
+export default function StrategyPage({ jobId }: { jobId: string }) {
   const { data, isLoading, isError } = useJobResults(jobId);
 
   if (isError) return <ErrorState message="Could not load the content strategy." />;

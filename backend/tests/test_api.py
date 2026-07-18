@@ -133,7 +133,7 @@ _BODY = {
 
 @pytest.fixture
 def service() -> JobService:
-    return JobService(FakeRunner())
+    return JobService(FakeRunner(), is_test=True)
 
 
 @pytest.fixture
@@ -301,7 +301,7 @@ async def test_invalid_request_is_rejected():
         is_valid=False, rejection_reason="injection", injection_detected=True,
         topic="", audience="a", goal="g", tone="t", platform="p",
     )
-    service = JobService(FakeRunner(profile=rejected))
+    service = JobService(FakeRunner(profile=rejected), is_test=True)
     async with _client_for(service) as client:
         resp = await client.post("/jobs", json=_BODY)
         assert resp.status_code == 201

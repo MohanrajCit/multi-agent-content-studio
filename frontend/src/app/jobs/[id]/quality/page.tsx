@@ -1,6 +1,5 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { Gauge } from "lucide-react";
 
 import { ScoreBar } from "@/components/score-bar";
@@ -24,8 +23,7 @@ const DIMENSIONS: { key: keyof EvaluationReport; label: string }[] = [
   { key: "audience_match", label: "Audience match" },
 ];
 
-export default function QualityPage() {
-  const { id: jobId } = useParams<{ id: string }>();
+export default function QualityPage({ jobId }: { jobId: string }) {
   const { data, isLoading, isError } = useJobResults(jobId);
 
   if (isError) return <ErrorState message="Could not load the quality scorecard." />;
